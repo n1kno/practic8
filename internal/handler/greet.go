@@ -6,7 +6,7 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/your-username/greeting-service/internal/store"
+	"github.com/n1kno/practic8/internal/store"
 )
 
 // Профессии для выпадающего списка
