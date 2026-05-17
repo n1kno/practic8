@@ -20,19 +20,8 @@ var professions = []string{
 	"Другое",
 }
 
-// Данные для главного шаблона (форма + таблица)
-type pageData struct {
-	Professions []string
-	Records     []store.Record
-}
-
-// FormHandler — главная страница с формой и таблицей
+// FormHandler возвращает HTML-форму
 func FormHandler(w http.ResponseWriter, r *http.Request) {
-	data := pageData{
-		Professions: professions,
-		Records:     store.GetAll(),
-	}
-
 	tmpl := `<!DOCTYPE html>
 <html>
 <head><title>Приветствие</title></head>
@@ -43,42 +32,21 @@ func FormHandler(w http.ResponseWriter, r *http.Request) {
         <input type="text" name="last_name" placeholder="Фамилия" required>
         <select name="profession" required>
             <option value="">Выберите профессию</option>
-            {{range .Professions}}
+            {{range .}}
             <option value="{{.}}">{{.}}</option>
             {{end}}
         </select>
         <button type="submit">Поздороваться</button>
     </form>
-    
-    <hr>
-    <h2>Все записи</h2>
-    {{if .Records}}
-    <table border="1">
-        <tr>
-            <th>Имя</th>
-            <th>Фамилия</th>
-            <th>Профессия</th>
-        </tr>
-        {{range .Records}}
-        <tr>
-            <td>{{.FirstName}}</td>
-            <td>{{.LastName}}</td>
-            <td>{{.Profession}}</td>
-        </tr>
-        {{end}}
-    </table>
-    {{else}}
-    <p>Пока нет записей.</p>
-    {{end}}
+    <p><a href="/list">Посмотреть все записи</a></p>
 </body>
 </html>`
-
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	t := template.Must(template.New("main").Parse(tmpl))
-	t.Execute(w, data)
+	t := template.Must(template.New("form").Parse(tmpl))
+	t.Execute(w, professions)
 }
 
-// GreetFormHandler обрабатывает POST от HTML-формы и перенаправляет на главную
+// GreetFormHandler обрабатывает POST от HTML-формы
 func GreetFormHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -94,15 +62,16 @@ func GreetFormHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Сохраняем запись
+	// Сохраняем запись в хранилище
 	store.Add(store.Record{
 		FirstName:  firstName,
 		LastName:   lastName,
 		Profession: profession,
 	})
 
-	// Перенаправляем на главную, чтобы избежать повторной отправки формы при обновлении страницы
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	// Возвращаем приветствие
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	fmt.Fprintf(w, "Привет, %s %s (%s)!<br><a href='/list'>Посмотреть все записи</a>", firstName, lastName, profession)
 }
 
 // JSON структуры
@@ -134,6 +103,7 @@ func GreetAPIHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Сохраняем
 	store.Add(store.Record{
 		FirstName:  req.FirstName,
 		LastName:   req.LastName,
@@ -147,7 +117,7 @@ func GreetAPIHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(resp)
 }
 
-// ListHTMLHandler — отдельная страница с таблицей (оставлена для обратной совместимости)
+// ListHTMLHandler отдаёт HTML-таблицу со всеми записями
 func ListHTMLHandler(w http.ResponseWriter, r *http.Request) {
 	records := store.GetAll()
 
