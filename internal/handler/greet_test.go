@@ -16,31 +16,45 @@ func TestFormHandler(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("expected 200, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "<form") {
+	body := w.Body.String()
+	if !strings.Contains(body, "<form") {
 		t.Error("response should contain form")
 	}
-	if !strings.Contains(w.Body.String(), "Инженер") {
+	if !strings.Contains(body, "Инженер") {
 		t.Error("profession options missing")
+	}
+	if !strings.Contains(body, "Пока нет записей") {
+		t.Error("expected 'Пока нет записей' when no records")
 	}
 }
 
-func TestGreetFormHandler(t *testing.T) {
+func TestGreetFormHandlerRedirect(t *testing.T) {
 	form := strings.NewReader("first_name=Иван&last_name=Петров&profession=Инженер")
 	req := httptest.NewRequest("POST", "/greet", form)
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	w := httptest.NewRecorder()
 	GreetFormHandler(w, req)
-	if w.Code != 200 {
-		t.Errorf("expected 200, got %d", w.Code)
+
+	// Ожидаем редирект 303
+	if w.Code != http.StatusSeeOther {
+		t.Errorf("expected 303 See Other, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), "Привет, Иван Петров (Инженер)!") {
-		t.Errorf("unexpected body: %s", w.Body.String())
+	location := w.Header().Get("Location")
+	if location != "/" {
+		t.Errorf("expected redirect to /, got %s", location)
 	}
 
-	// Проверяем сохранение
+	// Проверяем, что запись сохранилась
 	all := store.GetAll()
-	if len(all) != 1 || all[0].FirstName != "Иван" || all[0].Profession != "Инженер" {
-		t.Errorf("record not saved correctly: %+v", all)
+	found := false
+	for _, rec := range all {
+		if rec.FirstName == "Иван" && rec.LastName == "Петров" && rec.Profession == "Инженер" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("record not saved correctly, records: %+v", all)
 	}
 }
 
@@ -57,10 +71,17 @@ func TestGreetAPIHandler(t *testing.T) {
 		t.Errorf("unexpected body: %s", w.Body.String())
 	}
 
-	// Проверяем сохранение (предыдущая запись + эта)
+	// Проверяем сохранение
 	all := store.GetAll()
-	if len(all) != 2 {
-		t.Errorf("expected 2 records, got %d", len(all))
+	found := false
+	for _, rec := range all {
+		if rec.FirstName == "Мария" && rec.LastName == "Иванова" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("record not saved from API")
 	}
 }
 
